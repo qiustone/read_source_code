@@ -1,0 +1,384 @@
+========================
+  PHP Coding Standards
+  PHP 源码编码标准
+========================
+
+This file lists several standards that any programmer adding or changing code in PHP should follow.
+任何想要添加或更改PHP源码的开发者都应该遵循这个文档下面列出的几个标准。
+Since this file was added at a very late stage of the development of PHP v3.0,
+这个文件从PHP v3.0版本的开发末期阶段被添加
+the code base does not (yet) fully follow it, but it's going in that general direction
+PHP的代码还没有完全遵循下面的标准, 但是会一直朝着这方向发展
+Since we are now well into version 5 releases, many sections have been recoded to use these rules.
+因为现在PHP5已经发布了, 大部分已经遵循了下面的规则
+
+
+Code Implementation
+代码实现
+-------------------
+0. Document your code in source files and the manual. [tm]
+   在你的代码源文件中提供技术手册 [Technical Manual]
+
+1. Functions that are given pointers to resources should not free them
+   给定的函数指针资源不应该free他们
+
+	For instance, ``function int mail(char *to, char *from)`` should NOT free to and/or from.
+	例如 function int mail(char *to, char *from) 不应该 free 参数 to 或 参数 from
+
+	Exceptions:
+	例外的情况:
+
+	- The function's designated behavior is freeing that resource E.g. efree()
+	- 函数本身被设计为释放资源 例如 efree()
+
+	- The function is given a boolean argument, that controls whether or not the function may free its arguments 
+	  给定的函数参数包含一个布尔值, 这个参数被用来控制是否释放
+	  (if true - the function must free its arguments, if false - it must not)
+	  如果为真 则函数释放参数, 如果为假 则不释放
+	  
+	- Low-level parser routines, 
+	  that are tightly integrated with the token cache and the bison code for minimum memory copying overhead.
+	  与底层解析器程序紧密集成的令牌缓存或内存拷贝开销最小的语法分析器生成器(GNU bison)代码
+	  (可以理解为C语言内嵌的一些汇编代码)
+  
+2. Functions that are tightly integrated with other functions within the same module,
+   and rely on each other non-trivial behavior, 
+   should be documented as such and declared 'static'. They should be avoided if possible
+   在同一个模块(module)中,函数应该彼此紧密集合,相互依赖的重要的功能应该用static声明
+	
+3. Use definitions and macros whenever possible, so that constants have meaningful names and can be easily manipulated. 
+   尽量使用定义和宏. 常量要起一个有意义的名字使代码更容易被操作
+   The only exceptions to this rule are 0 and 1, when used as false and true (respectively).
+   0和1分别被当作false, true时可以例外
+   Any other use of a numeric constant to specify different behavior or actions should be done through a #define.
+   其他使用一个数字常量去指定不同行为或动作的应该尽可能用 #define
+   
+4. When writing functions that deal with strings, be sure to remember that PHP holds the length property of each string, 
+   当写一个字符串处理函数时,一定要记得PHP每个字符串的长度属性[要使用zend_parse_parameters_ex获取到的字符串长度]
+   and that it shouldn't be calculated with strlen(). 
+   而且不要用strlen来计算这个长度(如果不是\0结尾的字符串strlen的计算是不准确的)
+   Write your functions in such a way so that they'll take advantage of the length property, 
+   这样在你的方法里利用长度属性
+   both for efficiency and in order for them to be binary-safe.
+   对效率和二进制安全都是有好处的
+   Functions that change strings and obtain their new lengths while doing so, should return that new length, 
+   使用函数改变字符串并获得他们的新长度的同时,应该返回新的长度
+   so it doesn't have to be recalculated with strlen() (e.g. php_addslashes())
+   这样就不用strlen重新计算了(例如 php_addslashes())
+	
+5. NEVER USE strncat().  If you're absolutely sure you know what you're doing,
+   绝对不要使用 strncat()函数. 如果你确定知道你在做什么
+   check its man page again, and only then, consider using it, and even then, try avoiding it.	
+   请再三查看该函数的使用手册,想清楚再使用. 即使这样也请尽量避免使用
+	
+6. Use ``PHP_*`` macros in the PHP source, and ``ZEND_*`` macros in the Zend part of the source.
+   在PHP的源码部分使用宏 PHP_* , 在Zend引擎源码部分使用宏 ZEND_*
+   Although the ``PHP_*`` macro's are mostly aliased to the ``ZEND_*`` macros it gives a better 
+   尽管几乎所有的宏 PHP_* 只是宏 ZEND_* 的一个别名. 但是它可以使代码的阅读性更好,
+   understanding on what kind of macro you're calling.	
+   更容易理解你调用的是哪种宏
+
+7. When commenting out code using a #if statement, do NOT use 0 only. 
+   当注释掉一段代码的时候不要只使用 #if 0 来声明.
+   Instead use "<git username here>_0". 
+   用git的账号加_0 来代替
+   For example, #if FOO_0, where FOO is your git user foo. 
+   例如 #if FOO_0, FOO表示你的git账号
+   This allows easier tracking of why code was commented out, especially in bundled libraries.
+   这使得更容易跟踪代码被注释掉了的原因, 尤其是在捆绑库的时候
+	
+8. Do not define functions that are not available. 
+   不要定义不可用的函数
+   For instance, if a library is missing a function, do not define the PHP version of the function, 
+   例如 一个库缺少一个函数或者这个函数没有定义响应的PHP版本
+   and do not raise a run-time error about the function not existing.  
+   如果在使用方法的时候也没有报出方法不存在的运行时错误
+   End users should use function_exists() to test for the existence of a function	
+   用户需要使用 function_exists() 去测试这个方法是否存在
+	
+9. Prefer emalloc(), efree(), estrdup(), etc. to their standard C library counterparts. 
+   emalloc(), efree(), estrdup() 等函数是对标准C库的一个封装.
+   These functions implement an internal "safety-net" mechanism that ensures the deallocation of any unfreed memory at the end of a request.
+   这些方法实现了一个内部安全的机制,以确保回收没有被释放的内存.
+   They also provide useful allocation and overflow information while running in debug mode.
+   而且这些函数在debug模式下还提供了非常有用的分配和溢出的信息
+   In almost all cases, memory returned to the engine must be allocated using emalloc().
+   在绝大多数情况下, 从内存到引擎必须使用 emalloc()函数来分配内存.
+   The use of malloc() should be limited to cases where a third-party library may need to control or free the memory, 
+   只有在有限情况下才可能需要用malloc()等C库函数来控制或释放内存 比如使用第三方库
+   or when the memory in question needs to survive between multiple requests.
+   或者当这块内存的生命周期需要在多个请求中生存的时候
+	
+User Functions/Methods Naming Conventions
+用户函数/方法名编码约定
+------------------
+
+1.  Function names for user-level functions should be enclosed with in the PHP_FUNCTION() macro. 
+	用户级函数的函数名应该用封闭的PHP_FUNCTION()宏
+    They should be in lowercase, with words underscore delimited, with care taken to minimize the letter count.
+	函数名应该是小写的,用字母和下划线组合,尽量缩短函数名
+    Abbreviations should not be used when they greatly decrease the readability of the function name itself::
+    但也不要用缩写,会降低函数名本身的的可读性
+	
+	Good:
+    'mcrypt_enc_self_test'
+    'mysql_list_fields'
+
+    Ok:
+    'mcrypt_module_get_algo_supported_key_sizes'
+    (could be 'mcrypt_mod_get_algo_sup_key_sizes'?)
+    'get_html_translation_table'
+    (could be 'html_get_trans_table'?)
+
+    Bad:
+    'hw_GetObjectByQueryCollObj'
+    'pg_setclientencoding'
+    'jf_n_s_i'
+	
+
+2.  If they are part of a "parent set" of functions, that parent should be included in the user function name, 
+    如果函数是父集的一部分, 父集名称应该包含在这个函数名中
+    and should be clearly related to the parent program or function family. This should be in the form of ``parent_*``::
+    并且应该明确该函数在父集中的关联性, 应该用 ``parent_*``:: 形式来命名
+
+	A family of 'foo' functions, for example:
+    
+    Good:
+    'foo_select_bar'
+    'foo_insert_baz'
+    'foo_delete_baz'
+
+    Bad:
+    'fooselect_bar'
+    'fooinsertbaz'
+    'delete_foo_baz'
+	
+3.  Function names used by user functions should be prefixed with ``_php_``,
+    功能型内部使用的函数名应该加前缀``_php_``
+    and followed by a word or an underscore-delimited list of words, in lowercase letters, that describes the function. 
+    紧随其后的应该是一个单词或用下划线分割的一组词, 并用小写字母, 描述这个方法
+	If applicable, they should be declared 'static'.
+	如果可以的话, 尽量加static关键字 [这条可以去参考PHP源码里的_php_stream_write_buffer函数]
+	
+4.  Variable names must be meaningful.  One letter variable names must be avoided, 
+    变量名必须是有意义的. 避免使用一个字母的变量名
+    except for places where the variable has no real meaning or a trivial meaning (e.g. for (i=0; i<100; i++) ...).
+	除非这个变量名没有实际意义或微不足道的意义. 例如for循环中的i
+	
+5.  Variable names should be in lowercase.  Use underscores to separate between words.
+    变量名应该用小写字母. 词与词之间用下划线分割
+	
+6.  Method names follow the 'studlyCaps' (also referred to as 'bumpy case' or 'camel caps') naming convention, 
+    方法名如'studlyCaps'(可参考驼峰命名法) 命名约定.
+    with care taken to minimize the letter count. 
+	尽量简化名字的字母个数
+	The initial letter of the name is lowercase, and each letter that starts a new 'word' is capitalized::
+	开头的字母名字是小写的并且名字新词的首字母是大写的
+	
+    Good:
+    'connect()'
+    'getData()'
+    'buildSomeWidget()'
+
+    Bad:
+    'get_Data()'
+    'buildsomewidget'
+    'getI()'
+	
+7.  Classes should be given descriptive names. Avoid using abbreviations where possible. 
+    类应该给出描述性的名称. 尽可能避免使用缩写.
+    Each word in the class name should start with a capital letter, without underscore delimiters (CamelCaps starting with a capital letter).
+	每个词的类名应该用大写字母开始. 没有下划线分隔符(CamelCaps从一个大写字母开始)
+    The class name should be prefixed with the name of the 'parent set' (e.g. the name of the extension)::
+    类名应该有"父集"的名称前缀(例如扩展的名称[可参考PDO的命名规则])
+
+    Good:
+    'Curl'
+    'FooBar'
+
+    Bad:
+    'foobar'
+    'foo_bar'
+
+Internal Function Naming Convensions
+内部函数命名约定
+----------------------
+
+1.  Functions that are part of the external API should be named 'php_modulename_function()' to avoid symbol collision. 
+    为了避免冲突,外部API函数应该用'php_modulename_function()' 这种形式命名
+    They should be in lowercase, with words underscore delimited. Exposed API must be defined in 'php_modulename.h'.
+	并且小写,用下划线分割. 对外暴露的API必须定义在你自己的 'php_modulename.h'头文件中. 例如下面
+	
+    PHPAPI char *php_session_create_id(PS_CREATE_SID_ARGS);
+	
+    Unexposed module function should be static and should not be defined in 'php_modulename.h'.
+	不对外暴露的api不要定义在你的'php_modulename.h' 头文件中,而且应该用 static关键字修饰. 例如下面
+	
+    static int php_session_destroy(TSRMLS_D)
+
+2.  Main module source file must be named 'modulename.c'.
+    主模块的源文件必须命名为 'modulename.c'.[ modulename 是你自己起的模块的名字 ]
+
+3.  Header file that is used by other sources must be named 'php_modulename.h'.
+    主模块的头文件被包含在其他的源文件中,必须命名为'php_modulename.h'.
+
+Syntax and indentation
+语法和缩进
+----------------------
+
+1.  Never use C++ style comments (i.e. // comment). 
+    不要使用C++风格的注释(也就是 // 注释)
+    Always use C-style comments instead.  PHP is written in C, and is aimed at compiling under any ANSI-C compliant compiler. 
+	用C风格的注释去代替它. PHP是用C写的, 并且意图在任何 ANSI-C 编译器下编译.
+	Even though many compilers accept C++-style comments in C code, you have to ensure that your code would compile with other compilers as well.
+	尽管许多编译器能够支持在C代码中使C++风格的注释, 但是为了确保你的代码兼容所有编译器最好还是使用C风格的注释
+    The only exception to this rule is code that is Win32-specific, because the Win32 port is MS-Visual C++ specific, 
+	唯一例外的是在win32下的代码, 因为Win32 使用的是 MS-Visual C++ , 
+    and this compiler is known to accept C++-style comments in C code.
+	这个编译器是明确支持在C代码中使用C++风格注释的
+		
+2.  Use K&R-style. Of course, we can't and don't want to force anybody to use a style he or she is not used to, 
+    使用K&R 风格. 当然 我们不能也不想强迫任何人用或不用这种风格
+    but, at the very least, when you write code that goes into the core of PHP or one of its standard modules,
+    但是 最起码, 当你写的代码提交到PHP的核心 或 标准模块之一
+	please maintain the K&R style. 
+    请保持 K&R 风格	
+	This applies to just about everything, starting with indentation and comment styles and up to function declaration syntax. 
+	这种风格可以应用到所有事物中去, 上到函数声明语法 下到缩进 注释风格 
+	Also see Indentstyle.
+	也可去看缩进风格
+	Indentstyle: http://www.catb.org/~esr/jargon/html/I/indent-style.html
+	
+3.  Be generous with whitespace and braces.
+    慷慨的空格和括号
+    Keep one empty line between the variable declaration section and the statements in a block,  
+	变量的声明和语句块之间要保留一个空行,
+	as well as between logical statement groups in a block.  
+	同样在逻辑语句块也要有空行
+	Maintain at least one empty line between two functions, preferably two.  Always prefer::
+	保持两个函数之间有一个空行,两个更好
+	
+	if (foo) {
+        bar;
+    }
+
+    to:
+
+    if(foo)bar;
+
+4.  When indenting, use the tab character.  A tab is expected to represent four spaces. 
+    当使用tab制表符进行缩进的时候. 预计一个tab 占用四个空格
+    It is important to maintain consistency in indenture so that definitions, comments, and control structures line up correctly.
+	重要的是在定义,注释,和正确的控制结构体排列 要保持一致 
+	
+5.  Preprocessor statements (#if and such) MUST start at column one.
+    预处理语句(例如 #if)必须写在第一列 
+    To indent preprocessor directives you should put the # at the beginning of a line, followed by any number of whitespace.
+	如果要缩进预处理语句也要把 # 号放在一行的开始, 紧接着是任意数量的空格
+	
+	
+Testing
+测试
+-------
+	
+1.  Extensions should be well tested using *.phpt tests. Read about that in README.TESTING.
+    PHP扩展应该用*.phpt 来测试. 请阅读 README.TESTING.
+	
+	
+Documentation and Folding Hooks
+文档和可折叠钩子
+-------------------------------
+
+In order to make sure that the online documentation stays in line with the code, 
+为了确保在线文档与代码保持一致
+each user-level function should have its user-level function prototype before it along with a brief one-line description of what the function does.
+每个用户级函数在有它的用户级函数原型之前,应该有一行简单的对函数的描述。
+It would look like this::
+它看起来应该是这样的::
+
+/* {{{ proto int abs(int number)
+ Returns the absolute value of the number */
+PHP_FUNCTION(abs)
+{
+ ...
+}
+/* }}} */
+
+
+The {{{ symbols are the default folding symbols for the folding mode in Emacs and vim (set fdm=marker).
+在Emacs 和 vim 中 符号 {{{ 在折叠模式下 默认是折叠符号 (set fdm=marker)
+Folding is very useful when dealing with large files because you can scroll through the file quickly and just unfold the function you wish to work on.  
+在处理大文件的时候折叠是非常有用的, 因为你能快速滚动文件并展开你希望工作的功能
+The }}} at the end of each function marks the end of the fold, and should be on a separate line.
+符号 }}} 在每个函数的结尾标志着折叠的结束, 并且应该在单独的一行
+
+
+The "proto" keyword there is just a helper for the doc/genfuncsummary script which generates a full function summary. 
+那里的"原型"关键字只是辅助doc/genfuncsummary脚本生成所有函数摘要的
+Having this keyword in front of the function prototypes allows us to put folds elsewhere in the code without messing up the function summary.
+该关键字在函数原型的前面允许我们放在折叠块里,不影响函数摘要
+
+
+Optional arguments are written like this::
+可选参数像下面这样写::
+
+  /* {{{ proto object imap_header(int stream_id, int msg_no [, int from_length [, int subject_length [, string default_host]]])
+     Returns a header object with the defined parameters */
+	 
+And yes, please keep the prototype on a single line, even if that line is massive.
+没错, 请保持原型在单独的一行, 即使这行可能会很长.
+
+
+New and Experimental Functions
+新的 实验性的函数
+-----------------------------------
+
+To reduce the problems normally associated with the first public implementation of a new set of functions, 
+在首次公开一套新的函数集实现时 为了减少相关问题
+it has been suggested that the first implementation include a file labeled 'EXPERIMENTAL' in the function directory, 
+有人建议 在这个函数的目录包含一个有“实验”标签的文件 
+and that the functions follow the standard prefixing conventions during their initial implementation.
+并且这个函数在最初实现的时候要遵循下面的标准前缀约定
+
+The file labelled 'EXPERIMENTAL' should include the following information::
+含有"实验"标签的文件应包括以下信息
+
+  Any authoring information (known bugs, future directions of the module).
+  在git的提交信息中要包括 作者信息(已知的bugs, 这个模块的特性指示)
+  Ongoing status notes which may not be appropriate for Git comments.
+  持续的状态记录以及不适用的状况
+
+In general new features should go to PECL or experimental branches until there are specific reasons for directly adding it to the core distribution.
+一般新特性应该提交到PECL或实验分支,除非有特殊原因会直接添加到核心发布
+
+Aliases & Legacy Documentation
+别名 & 遗留文档
+-----------------------------------
+
+You may also have some deprecated aliases with close to duplicate names, for example, somedb_select_result and somedb_selectresult. 
+你也可能有一些弃用的别名或接近重复的名字, 例如  somedb_select_result and somedb_selectresult
+For documentation purposes, these will only be documented by the most current name, with the aliases listed in the documentation for the parent function. 
+一些人只会记录最新的名字, 别名会记录在父函数的文档列表中
+For ease of reference, user-functions with completely different names, that alias to the same function (such as highlight_file and show_source), will be separately documented. 
+为了便于参考, 这种用户层函数名字完全不同, 别名是同样的方法将被分别记录.
+The proto should still be included, describing which function is aliased.
+描述函数别名的原型仍应包括在内
+
+Backwards compatible functions and names should be maintained as long as the code can be reasonably be kept as part of the codebase.
+只要这部分代码能够被维护, 功能和名称应该尽可能保持向后兼容
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	
